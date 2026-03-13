@@ -58,7 +58,7 @@ if page == "Operational Dashboard":
             
         with col2:
             st.subheader("Booking Status Distribution")
-            status_chart = df["Booking_Status"].value_value_counts().reset_index()
+          status_chart = df["Booking_Status"].value_counts().reset_index()
             fig_pie = px.pie(status_chart, names="Booking_Status", values="count")
             st.plotly_chart(fig_pie, use_container_width=True)
 
@@ -80,3 +80,4 @@ else:
     elif query_option == "2. Ratings by Vehicle":
         res = df.groupby("Vehicle_Type")["Customer_Rating"].mean()
         st.bar_chart(res)
+
