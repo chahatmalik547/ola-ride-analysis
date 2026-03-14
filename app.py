@@ -9,12 +9,12 @@ st.set_page_config(page_title="OLA Analytics Pro", layout="wide")
 @st.cache_data
 def load_data():
     try:
-        # Try to connect to your Local MySQL (Works on your laptop)
+        # Try to connect to your Local MySQL
         conn = st.connection("mysql", type="sql")
         df = conn.query("SELECT * FROM ola_dataset", ttl=600)
         return df
     except Exception:
-        # FALLBACK: Load CSV (Works on Streamlit Cloud/Web)
+        # FALLBACK: Load CSV
         try:
             df = pd.read_csv("OLA_DataSet.csv")
             df.columns = df.columns.str.strip() # Clean column names
@@ -36,7 +36,7 @@ if not df.empty:
     if page == "Operational Dashboard":
         st.title("🚖 OLA Executive Operations Report")
 
-        # Top Level Metrics
+        # Top Level Metrics (Insight 9 - Total Booking Value)
         success_df = df[df["Booking_Status"] == "Success"]
         total_rev = success_df["Booking_Value"].sum()
         total_rides = len(df)
@@ -44,9 +44,9 @@ if not df.empty:
         avg_dist = success_df["Ride_Distance"].mean()
 
         m1, m2, m3 = st.columns(3)
-        m1.metric("Total Revenue", f"₹{total_rev:,.0f}")
+        m1.metric("Total Revenue (Success)", f"₹{total_rev:,.0f}")
         m2.metric("Success Rate", f"{success_rate:.1f}%")
-        m3.metric("Avg Distance", f"{avg_dist:.1f} km")
+        m3.metric("Avg Ride Distance", f"{avg_dist:.1f} km")
 
         st.divider()
 
@@ -60,7 +60,6 @@ if not df.empty:
 
         with col2:
             st.subheader("📉 Booking Status Breakdown")
-            # FIXED: Changed value_value_counts to value_counts
             status_chart = df["Booking_Status"].value_counts().reset_index()
             fig_pie = px.pie(status_chart, names="Booking_Status", values="count", hole=0.4)
             st.plotly_chart(fig_pie, use_container_width=True)
@@ -73,30 +72,71 @@ if not df.empty:
         query_option = st.selectbox("Select an Insight to View", [
             "1. Successful Bookings",
             "2. Avg Distance per Vehicle",
-            "3. Top 5 Customers by Volume",
-            "4. Ratings Analysis",
-            "5. Incomplete Rides Breakdown"
+            "3. Rides Cancelled by Customers",
+            "4. Top 5 Customers by Volume",
+            "5. Driver Cancellations (Personal/Car)",
+            "6. Max/Min Ratings (Prime Sedan)",
+            "7. UPI Payment Method Rides",
+            "8. Avg Customer Rating per Vehicle",
+            "9. Total Successful Booking Value",
+            "10. Incomplete Rides Breakdown"
         ])
+
+        st.info(f"Showing results for: {query_option}")
 
         if query_option == "1. Successful Bookings":
             res = df[df["Booking_Status"] == "Success"]
+            st.write(f"Total Successful Bookings: **{len(res)}**")
             st.dataframe(res.head(100))
             
         elif query_option == "2. Avg Distance per Vehicle":
             res = df.groupby("Vehicle_Type")["Ride_Distance"].mean().reset_index()
-            st.bar_chart(res.set_index("Vehicle_Type"))
-
-        elif query_option == "3. Top 5 Customers by Volume":
-            res = df["Customer_ID"].value_counts().head(5).reset_index()
+            res.columns = ["Vehicle Type", "Avg Distance"]
+            st.bar_chart(res.set_index("Vehicle Type"))
             st.table(res)
 
-        elif query_option == "4. Ratings Analysis":
+        elif query_option == "3. Rides Cancelled by Customers":
+            count = len(df[df["Booking_Status"] == "Canceled by Customer"])
+            st.metric("Total Customer Cancellations", count)
+            st.write("Insight: Highlights potential user frustration or wait-time issues.")
+
+        elif query_option == "4. Top 5 Customers by Volume":
+            res = df["Customer_ID"].value_counts().head(5).reset_index()
+            res.columns = ["Customer ID", "Total Rides"]
+            st.table(res)
+
+        elif query_option == "5. Driver Cancellations (Personal/Car)":
+            # Matching your SQL logic for specific cancellation reasons
+            count = len(df[df["Canceled_Rides_by_Driver"] == "Personal & Car related issue"])
+            st.metric("Driver Cancellations (Personal/Car)", count)
+
+        elif query_option == "6. Max/Min Ratings (Prime Sedan)":
+            prime_sedan = df[df["Vehicle_Type"] == "Prime Sedan"]
+            max_r = prime_sedan["Driver_Ratings"].max()
+            min_r = prime_sedan["Driver_Ratings"].min()
+            c1, c2 = st.columns(2)
+            c1.metric("Highest Rating", max_r)
+            c2.metric("Lowest Rating", min_r)
+
+        elif query_option == "7. UPI Payment Method Rides":
+            res = df[df["Payment_Method"] == "UPI"]
+            st.write(f"Total UPI Transactions: **{len(res)}**")
+            st.dataframe(res.head(100))
+
+        elif query_option == "8. Avg Customer Rating per Vehicle":
             res = df.groupby("Vehicle_Type")["Customer_Rating"].mean().reset_index()
-            st.line_chart(res.set_index("Vehicle_Type"))
+            res.columns = ["Vehicle Type", "Avg Rating"]
+            st.line_chart(res.set_index("Vehicle Type"))
+            st.table(res)
             
-        elif query_option == "5. Incomplete Rides Breakdown":
+        elif query_option == "9. Total Successful Booking Value":
+            total_val = df[df["Booking_Status"] == "Success"]["Booking_Value"].sum()
+            st.metric("Total Revenue from Success Rides", f"₹{total_val:,.2f}")
+
+        elif query_option == "10. Incomplete Rides Breakdown":
             incomplete = df[df["Incomplete_Rides"] == "Yes"]
-            res = incomplete["Incomplete_Rides_Reason"].value_counts().reset_index()
+            res = incomplete[["Booking_ID", "Incomplete_Rides_Reason"]]
+            st.write(f"Total Incomplete Rides: **{len(res)}**")
             st.dataframe(res)
 
 else:
